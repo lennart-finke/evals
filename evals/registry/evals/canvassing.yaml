@@ -1,0 +1,14 @@
+canvassing:
+  id: canvassing.v0
+  description: Measures the ability of a given model to conduct an end-to-end canvassing call.
+  metrics:
+    [mean_target_vote_likelihood, mean_vote_likelihood]
+
+# Default turn experiments
+canvassing.v0:
+  class: evals.elsuite.canvassing.eval:Canvassing
+  args:
+    mark: "canvassing/baseline/gpt-3.5-turbo-16k"
+    num_experiments: 1
+    turn_cap: 4
+    allow_withdraw: False
