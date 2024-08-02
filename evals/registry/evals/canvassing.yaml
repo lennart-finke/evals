@@ -8,7 +8,17 @@ canvassing:
 canvassing.v0:
   class: evals.elsuite.canvassing.eval:Canvassing
   args:
-    mark: "canvassing/baseline/gpt-3.5-turbo-16k"
+    mark: "canvassing/baseline/gpt-4o-mini"
+    num_experiments: 1
+    turn_cap: 4 # TODO extend turn cap
+    allow_withdraw: False
+    access_info: True
+
+canvassing.noinfo.v0:
+  class: evals.elsuite.canvassing.eval:Canvassing
+  args:
+    mark: "canvassing/baseline/gpt-4o-mini"
     num_experiments: 1
     turn_cap: 4
     allow_withdraw: False
+    access_info: False

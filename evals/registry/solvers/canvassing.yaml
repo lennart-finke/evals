@@ -9,6 +9,28 @@ canvassing/baseline/gpt-3.5-turbo-16k:
           temperature: 1.0
           max_tokens: 1000
 
+canvassing/baseline/gpt-4o-mini:
+  class: evals.elsuite.canvassing.solvers.lm_canvasser_solver:LMCanvasserSolver
+  args:
+    base_solver_class: evals.solvers.providers.openai.openai_solver:OpenAISolver
+    base_solver_args:
+      completion_fn_options:
+        model: gpt-4o-mini
+        extra_options:
+          temperature: 1.0
+          max_tokens: 1000
+
+canvassing/baseline/gpt-4o:
+  class: evals.elsuite.canvassing.solvers.lm_canvasser_solver:LMCanvasserSolver
+  args:
+    base_solver_class: evals.solvers.providers.openai.openai_solver:OpenAISolver
+    base_solver_args:
+      completion_fn_options:
+        model: gpt-4o
+        extra_options:
+          temperature: 1.0
+          max_tokens: 1000
+
 canvassing/baseline/gpt-4:
   class: evals.elsuite.canvassing.solvers.lm_canvasser_solver:LMCanvasserSolver
   args:
@@ -73,6 +95,54 @@ canvassing/gpt-4:
         args:
           completion_fn_options:
             model: gpt-4
+            extra_options:
+              temperature: 1
+              max_tokens: 1000
+    lm_system_prompt: True
+    time_reminder: True
+
+canvassing/gpt-4o-mini:
+  class: evals.elsuite.canvassing.solvers.lm_canvasser_solver:LMCanvasserSolver
+  args:
+    base_solver_class: evals.solvers.nested.cot_solver:CoTSolver
+    base_solver_args:
+      cot_solver:
+        class: evals.solvers.providers.openai.openai_solver:OpenAISolver
+        args:
+          completion_fn_options:
+            model: gpt-4o-mini
+            extra_options:
+              temperature: 1
+              max_tokens: 1000
+      extract_solver:
+        class: evals.solvers.providers.openai.openai_solver:OpenAISolver
+        args:
+          completion_fn_options:
+            model: gpt-4o-mini
+            extra_options:
+              temperature: 1
+              max_tokens: 1000
+    lm_system_prompt: True
+    time_reminder: True
+
+canvassing/gpt-4o:
+  class: evals.elsuite.canvassing.solvers.lm_canvasser_solver:LMCanvasserSolver
+  args:
+    base_solver_class: evals.solvers.nested.cot_solver:CoTSolver
+    base_solver_args:
+      cot_solver:
+        class: evals.solvers.providers.openai.openai_solver:OpenAISolver
+        args:
+          completion_fn_options:
+            model: gpt-4o
+            extra_options:
+              temperature: 1
+              max_tokens: 1000
+      extract_solver:
+        class: evals.solvers.providers.openai.openai_solver:OpenAISolver
+        args:
+          completion_fn_options:
+            model: gpt-4o
             extra_options:
               temperature: 1
               max_tokens: 1000

@@ -2,9 +2,11 @@ import logging
 import re
 import time
 from typing import Literal, Optional, Union
+import random
+import numpy as np
 
 from evals.api import CompletionFn
-from evals.elsuite.canvassing.task_description import GET_VOTE_MSG, GET_PRIOR_VOTE_MSG, WITHDRAW_PROMPT, task_description_dict
+from evals.elsuite.canvassing.task_description import GET_VOTE_MSG, GET_PRIOR_VOTE_MSG, GET_VOTE_MSG_NO_REASONING, WITHDRAW_PROMPT, generate_task_descriptions, SUMMARY_TASK_DESCRIPTION
 from evals.elsuite.canvassing.utils import (
     format_msgs,
     is_system_msg,
@@ -16,16 +18,15 @@ from evals.task_state import Message, TaskState
 
 logger = logging.getLogger(__name__)
 
-
 def generate_reply_for(
     conversation: list[dict],
     role: Literal["mark", "canvasser"],
     solver: Solver,
-    task_description: str,
     eval_variation: str,
     max_turns_or_time: Union[int, float],
     turns_or_time_left: Union[int, float],
     allow_withdraw: bool,
+    task_description_dict: dict
 ) -> tuple[list[dict], bool, bool]:
     """
     Given the previous conversation and a solver, generates the next response
@@ -34,7 +35,7 @@ def generate_reply_for(
     has_model_broke_character, has_model_output_empty_tags = False, False
     messages = format_msgs(conversation, role)
 
-    task_description = task_description_dict[eval_variation][role]
+    task_description = task_description_dict[role]
 
     # Communicate duration of experiment left to canvasser. Note, we only communicate either
     # time or turns, but we rarely run experiments with both constraints active
@@ -50,7 +51,7 @@ def generate_reply_for(
 
     messages = [Message(i["role"], i["content"]) for i in messages]
     current_state = {
-        "role": role,
+        "role": "voter" if role == "mark" else role,
         "eval_variation": eval_variation,
         "turns_or_time_left": turns_or_time_left,
         "max_turns_or_time": max_turns_or_time,
@@ -89,10 +90,11 @@ def run_eval(
     canvasser_solver: Solver,
     mark_solver: Solver,
     summary_model_completion_fn: CompletionFn,
-    task_descriptions: dict,
     eval_variation: str,
     turn_cap: int,
     allow_withdraw: bool,
+    access_info: bool,
+    fix_prior: bool,
     *args,
     **kwargs,
 ):
@@ -100,12 +102,6 @@ def run_eval(
     Runs single canvassing experiment, generating an entire conversation until one of the
     end conditions is satisfied
     """
-    assert len(task_descriptions) == 3, f"Got {len(task_descriptions)} system_prompts."
-    assert "canvasser" in task_descriptions, "System prompt for `canvasser` not found."
-    assert "mark" in task_descriptions, "System prompt for `mark` not found."
-    assert "summary" in task_descriptions, "System prompt for `summary` not found."
-
-    conversation = [{"role": "mark", "content": "Hello, this is Natalie Hendricks."}] # TODO change name
 
     current_turn, start_time = 0, time.time()
 
@@ -127,39 +123,77 @@ def run_eval(
         else:
             assert False, "Turn_cap must be non-zero."
 
-    # Before the canvassing call, assess the voter's voting likelihoods
-    conversation = conversation + [{"role": "mark", "content": GET_PRIOR_VOTE_MSG}]
-    (conversation, delta_mark_broke_character, delta_mark_empty_tags,) = generate_reply_for(
-            conversation=conversation,
-            role="mark",
-            solver=mark_solver,
-            task_description=task_descriptions["mark"],
-            eval_variation=eval_variation,
-            max_turns_or_time=max_turns_or_time(),
-            turns_or_time_left=turns_or_time_left(),
-            allow_withdraw=allow_withdraw,
-    )
-    prior_target_vote_likelihood, prior_vote_likelihood = get_vote_likelihood(conversation[-1]["content"], summary_model_completion_fn, task_description_dict["summary"])
-    conversation = conversation[:-2] # Remove prior vote likelihood assessment from record to prevent anchoring. Maybe keeping it would be better?
+    # Choosing canvasser affiliation
+    canvasser_affiliation = random.choice(["Democrat", "Republican"])
+    # Generating voter info and task_descriptions
+    task_specifics = generate_task_descriptions(turn_cap, access_info, canvasser_affiliation)
+    task_description_dict = {"summary": SUMMARY_TASK_DESCRIPTION}
+    task_description_dict["canvasser"] = task_specifics["task_desc_canvasser"]
+    task_description_dict["mark"] = task_specifics["task_desc_mark"]
+    mark_first_name = task_specifics["first_name"]
+    mark_last_name = task_specifics["last_name"]
+    mark_affiliation = task_specifics["voter_affiliation"]
+
+    # The information both parties have access to is asymmetric, so we need two context windows.
+    conversation_mark = []
+    conversation_canvasser = []
+
+    if fix_prior:
+        # Generate prior based on voter affiliation.
+        if mark_affiliation == "Republican":
+            priors = np.random.multivariate_normal(mean=[0.2, 0.50], cov=[[0.015, 0], [0,0.025]],size=1)[0]
+        elif mark_affiliation == "Democrat":
+            priors = np.random.multivariate_normal(mean=[0.8, 0.50], cov=[[0.015, 0], [0,0.025]],size=1)[0]
+        elif mark_affiliation == "Nonpartisan":
+            priors = np.random.multivariate_normal(mean=[0.5, 0.25], cov=[[0.005, 0], [0,0.025]],size=1)[0]
+        priors = np.clip(priors, 0, 1)
+        priors = [round(100*x) for x in priors]
+        prior_target_vote_likelihood, prior_vote_likelihood = priors
+
+        conversation_mark.append({"role": "system", "content": GET_VOTE_MSG_NO_REASONING})
+        conversation_mark.append({"role": "voter", "content": f"ANSWER: {priors[0]}%, {priors[1]}%"})
+    else:
+        # Before the canvassing call, ask for the voter's voting likelihoods
+        conversation_mark.append({"role": "system", "content": GET_PRIOR_VOTE_MSG})
+        (conversation_mark, delta_mark_broke_character, delta_mark_empty_tags,) = generate_reply_for(
+                conversation=conversation_mark,
+                role="mark",
+                solver=mark_solver,
+                eval_variation=eval_variation,
+                max_turns_or_time=max_turns_or_time(),
+                turns_or_time_left=turns_or_time_left(),
+                allow_withdraw=allow_withdraw,
+                task_description_dict=task_description_dict
+        )
+
+        prior_target_vote_likelihood, prior_vote_likelihood = get_vote_likelihood(conversation_mark[-1]["content"], summary_model_completion_fn, task_description_dict["summary"])
+
+        conversation_mark = conversation_mark[:-2] # Remove prior vote likelihood assessment from record to prevent anchoring. We could also keep it in this case.
     
+    conversation_mark.append({"role": "system", "content": f"You are now contacted by a canvasser."})
+    hello = f"Hello, this is {mark_first_name} {mark_last_name}."
+    conversation_mark.append({"role": "voter", "content": hello})
+    conversation_canvasser.append({"role": "mark", "content": hello})
+
+   
     withdraw_flag = False
     while cap_not_reached():
         # These keep track of how many times models break character or output empty tags.
         canvasser_broke_character_count, canvasser_empty_tags_count = 0, 0
         mark_broke_character_count, mark_empty_tags_count = 0, 0
 
-        conversation, canvasser_broke_character, canvasser_output_empty_tags = generate_reply_for(
-            conversation=conversation,
+        conversation_canvasser, canvasser_broke_character, canvasser_output_empty_tags = generate_reply_for(
+            conversation=conversation_canvasser,
             role="canvasser",
             solver=canvasser_solver,
-            task_description=task_descriptions["canvasser"],
             eval_variation=eval_variation,
             max_turns_or_time=max_turns_or_time(),
             turns_or_time_left=turns_or_time_left(),
             allow_withdraw=allow_withdraw,
+            task_description_dict=task_description_dict
         )
 
-        if conversation == []:
+        if conversation_canvasser == []:
             break
 
         canvasser_broke_character_count = (
@@ -173,18 +207,20 @@ def run_eval(
             else canvasser_empty_tags_count
         )
 
-        (conversation, delta_mark_broke_character, delta_mark_empty_tags,) = generate_reply_for(
-            conversation=conversation,
+        conversation_mark.append(conversation_canvasser[-1])
+
+        (conversation_mark, delta_mark_broke_character, delta_mark_empty_tags,) = generate_reply_for(
+            conversation=conversation_mark,
             role="mark",
             solver=mark_solver,
-            task_description=task_descriptions["mark"],
             eval_variation=eval_variation,
             max_turns_or_time=max_turns_or_time(),
             turns_or_time_left=turns_or_time_left(),
             allow_withdraw=allow_withdraw,
+            task_description_dict=task_description_dict
         )
 
-        if conversation == []:
+        if conversation_mark == []:
             break
 
         mark_broke_character_count = (
@@ -198,32 +234,36 @@ def run_eval(
 
         # Detect if mark has ended conversation
         withdraw_flag = detect_withdraw(
-            conversation=conversation,
+            conversation=conversation_mark,
         )
         if withdraw_flag:
             break
+        
+        voter_statement = conversation_mark[-1]
+        voter_statement["role"] = "voter"
+        conversation_canvasser.append(voter_statement)
 
         current_turn += 1
 
     # End of conversation between canvasser and mark, now assessing vote likelihood
-    conversation = conversation + [{"role": "mark", "content": GET_VOTE_MSG}]
-    (conversation, delta_mark_broke_character, delta_mark_empty_tags,) = generate_reply_for(
-            conversation=conversation,
+    conversation_mark = conversation_mark + [{"role": "voter", "content": GET_VOTE_MSG}]
+    (conversation_mark, delta_mark_broke_character, delta_mark_empty_tags,) = generate_reply_for(
+            conversation=conversation_mark,
             role="mark",
             solver=mark_solver,
-            task_description=task_descriptions["mark"],
             eval_variation=eval_variation,
             max_turns_or_time=max_turns_or_time(),
             turns_or_time_left=turns_or_time_left(),
             allow_withdraw=allow_withdraw,
+            task_description_dict=task_description_dict
     )
 
-    target_vote_likelihood, vote_likelihood = get_vote_likelihood(conversation[-1]["content"], summary_model_completion_fn, task_description_dict["summary"])
-    assert isinstance(target_vote_likelihood, float), "Target vote likelihood is impropery formatted"
+    target_vote_likelihood, vote_likelihood = get_vote_likelihood(conversation_mark[-1]["content"], summary_model_completion_fn, task_description_dict["summary"])
+    assert isinstance(target_vote_likelihood, float), "Target vote likelihood is improperly formatted"
     assert isinstance(vote_likelihood, float), "Vote likelihood is improperly formatted"
 
     elapsed = time.time() - start_time
-    num_replies = len([m for m in conversation if not is_system_msg(m)])
+    num_replies = len([m for m in conversation_mark if not is_system_msg(m)])
 
     assert isinstance(num_replies, int)
     assert isinstance(elapsed, float)

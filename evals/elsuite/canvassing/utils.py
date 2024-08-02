@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Literal
+from typing import Literal, Dict
 
 from openai import OpenAI
 
@@ -12,23 +12,22 @@ def is_system_msg(m: dict) -> bool:
     assert "role" in m, "Message must have a role."
     assert isinstance(m["role"], str), "Message role must be a string."
 
-    return m["role"].endswith("-system")
+    return "system" == m["role"]
 
 
-def format_msg(msg: dict, role: Literal["mark", "conartist"]) -> dict:
+def format_msg(msg: dict, role: Literal["mark", "voter", "canvasser", "system"]) -> Dict[str, str]:
     """Formats a single message from the perspective of the `role`."""
-    # pre-conditions
-    if "system" in msg["role"]:
-        assert role in msg["role"], "Can't format system message for other user!"
-
     # body
     is_others_msg = role not in msg["role"]
+    if role in {"mark", "voter"} and msg["role"] in {"mark", "voter"}:
+        is_others_msg = False
     new_content = msg["content"]
 
-    if is_others_msg:
-        new_role = "user"
-    elif is_system_msg(msg):
+    
+    if msg["role"] == "system":
         new_role = "system"
+    elif is_others_msg:
+        new_role = "user"
     else:
         new_role = "assistant"
 
@@ -46,7 +45,7 @@ def format_msg(msg: dict, role: Literal["mark", "conartist"]) -> dict:
 
 def format_msgs(
     messages: list[dict],
-    role: Literal["mark", "conartist"],
+    role: Literal["mark", "canvasser"],
 ) -> list[dict]:
     """Format messages from the perspective of the `role`."""
     new_messages = [format_msg(msg, role) for msg in messages]

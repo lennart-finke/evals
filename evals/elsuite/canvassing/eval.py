@@ -6,7 +6,6 @@ import numpy as np
 import evals
 import evals.elsuite.canvassing.canvassing as canvassing
 from evals.api import CompletionFn
-from evals.elsuite.canvassing.task_description import task_description_dict
 from evals.eval import SolverEval
 from evals.record import RecorderBase
 from evals.registry import is_chat_model, registry
@@ -20,12 +19,14 @@ class Canvassing(SolverEval):
     def __init__(
         self,
         completion_fns: list[CompletionFn],
-        mark: str = "canvassing/baseline/gpt-3.5-turbo-16k",
-        summary: str = "gpt-3.5-turbo-16k",
+        mark: str = "canvassing/baseline/gpt-4o-mini",
+        summary: str = "gpt-4o-mini",
         prompt_version: str = "balanced",
         num_experiments: int = 100,
         turn_cap: int = 4, # TODO revert to 30
         allow_withdraw: bool = False,
+        access_info: bool = True,
+        fix_prior: bool = True,
         *args,
         **kwargs,
     ):
@@ -35,6 +36,8 @@ class Canvassing(SolverEval):
             prompt_version: The version of the prompt to use for the mark. One of "balanced" (control setting), "guarded" (mark is hesitant), or "generous" (mark is generous).
             num_experiments: Sample size or number of experiments to run. Each experiment is run with the same settings.
             turn_cap: The maximum number of turns to allow in the canvasser-mark conversation.
+            access_info: Whether the canvasser can access biographical information and political orientation of the voter
+            fix_prior: Whether to put prior voting likelihoods in the context window, else let the voter generate their own priors and remove from context window.
         """
 
         super().__init__(completion_fns, *args, **kwargs)
@@ -46,18 +49,13 @@ class Canvassing(SolverEval):
             registry.make_completion_fn(mark, extra_options={"temperature": 1.0}),
         )
         self.summary = registry.make_completion_fn(summary, extra_options={"temperature": 0})
-
         self.num_experiments = num_experiments
-
-        self.task_descriptions = {
-            "canvasser": task_description_dict[prompt_version]["canvasser"],
-            "mark": task_description_dict[prompt_version]["mark"],
-            "summary": task_description_dict["summary"]
-        }
         self.eval_variation = prompt_version
 
         self.turn_cap = turn_cap
         self.allow_withdraw = allow_withdraw
+        self.access_info = access_info
+        self.fix_prior = fix_prior
 
         logger.info(
             f"Running canvassing eval with parameters: prompt_version={prompt_version}, num_experiments={num_experiments}, turn_cap={turn_cap}"
@@ -70,10 +68,11 @@ class Canvassing(SolverEval):
             canvasser_solver=solver,
             mark_solver=self.mark,
             summary_model_completion_fn=self.summary,
-            task_descriptions=self.task_descriptions,
             eval_variation=self.eval_variation,
             turn_cap=self.turn_cap,
             allow_withdraw=self.allow_withdraw,
+            access_info=self.access_info,
+            fix_prior=self.fix_prior
         )
 
         evals.record.record_metrics(
