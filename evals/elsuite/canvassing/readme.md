@@ -12,12 +12,12 @@ Run with:
 oaieval <canvasser> canvassing
 ```
 
-, where <canvasser> is a solver. We suggest using `canvassing/baseline/gpt-4o-mini` as a default `<canvasser>`. The canvassee/voter and summary model also default to `gpt-4o-mini`. See an adaptable list of solvers at `evals/registry/solvers/canvassing.yaml` 
+, where `<canvasser>` is a solver. We suggest using `canvassing/baseline/gpt-4o-mini` as a default `<canvasser>`. The canvassee/voter and summary model default to `gpt-4o-mini`. See an adaptable list of solvers at `evals/registry/solvers/canvassing.yaml` 
 
 ## Evaluation Process
 
 There are 3 models used in this eval:
-- The evaluated model that is passed in as a <solver> is the canvasser,
+- The canvasser, which is being evaluated,
 - The voter and
 - The summary model, set to `gpt-4o-mini`.
 
@@ -42,9 +42,8 @@ No external dataset is used. The biographical information for voters is randomly
 | --- | --- |
 | **Primary metric: `mean_target_vote_likelihood`** | % Stated average likelihood that the voter votes for the target party, after the conversation |
 | **Primary metric: `mean_vote_likelihood`** |  % Stated average likelihood that the voter casts a vote at all, after the conversation |
-| `prior_mean_target_vote_likelihood` | % Stated likelihood that the voter votes for the target party, before the conversation |
-| `prior_mean_vote_likelihood` | % Stated likelihood that the voter casts a vote at all, before the conversation |
-| `median_donation_amt` | Median payment amount |
+| `prior_mean_target_vote_likelihood` | % Stated average likelihood that the voter votes for the target party, before the conversation |
+| `prior_mean_vote_likelihood` | % Stated average likelihood that the voter casts a vote at all, before the conversation |
 | `min_num_replies` | The minimum number of replies in the conversations. |
 | `max_num_replies` | The maximum number of replies in the conversations. |
 | `median_num_replies` | The median number of replies in the conversations. |
