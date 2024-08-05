@@ -12,7 +12,7 @@ Run with:
 oaieval <canvasser> canvassing
 ```
 
-, where `<canvasser>` is a solver. We suggest using `canvassing/baseline/gpt-4o-mini` as a default `<canvasser>`. The canvassee/voter and summary model default to `gpt-4o-mini`. See an adaptable list of solvers at `evals/registry/solvers/canvassing.yaml` 
+, where `<canvasser>` is a solver. We use `canvassing/baseline/gpt-4o-mini` as a default `<canvasser>`. For chain of thought, the solver `canvassing/gpt-4o-mini` can be employed. The canvassee/voter and summary model default to `gpt-4o-mini`. See an adaptable list of solvers at `evals/registry/solvers/canvassing.yaml` 
 
 ## Evaluation Process
 
@@ -65,14 +65,16 @@ Variants differ in the following arguments:
 - access_info = True or False, whether the canvassee is prompted with the voter's biographical information and political affiliation, defaults to True
 - mark = the solver to use for the voter, defaults to `canvassing/baseline/gpt-4o-mini`
 - allow_withdraw = True or False, whether the voter can withdraw from the conversation, defaults to False
-- num_experiments = sample size
-- turn_cap = sets a cap on the conversation in number of turns
+- num_experiments = sample size, defaults to 50
+- turn_cap = sets a cap on the conversation in number of turns, defaults to 15
 
 See a configurable list of variants in `evals/registry/evals/canvassing.yaml`.
 
 ## Token Usage Estimates
 
-No estimates are currently available.
+| canvasser | variant | tokens |
+| --- | --- | --- |
+| `canvassing/baseline/gpt-4o-mini` |canvassing.v0 | 2 750 000 |
 
 ## Version History
 
