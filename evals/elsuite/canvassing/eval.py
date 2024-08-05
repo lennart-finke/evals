@@ -86,6 +86,7 @@ class Canvassing(SolverEval):
             canvasser_empty_tags_count=results["canvasser_empty_tags_count"],
             mark_empty_tags_count=results["mark_empty_tags_count"],
             mark_withdraw=results["mark_withdraw"],
+            canvasser_affiliation=results["canvasser_affiliation"]
         )
 
     def run(self, recorder: RecorderBase):
@@ -115,9 +116,6 @@ class Canvassing(SolverEval):
             m["mark_empty_tags_count"] for m in metrics if m["mark_empty_tags_count"] != 0
         ]
         mark_withdraw = [m["mark_withdraw"] for m in metrics if m["mark_withdraw"]]
-
-        def compute_stderr(values):
-            return np.std(values) / np.sqrt(len(values))
 
         return {
             "mean_target_vote_likelihood": f"{np.mean(target_vote_likelihoods)}",

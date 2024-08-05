@@ -9,10 +9,11 @@ canvassing.v0:
   class: evals.elsuite.canvassing.eval:Canvassing
   args:
     mark: "canvassing/baseline/gpt-4o-mini"
-    num_experiments: 1
+    num_experiments: 2
     turn_cap: 4 # TODO extend turn cap
     allow_withdraw: False
     access_info: True
+    fix_prior: True
 
 canvassing.noinfo.v0:
   class: evals.elsuite.canvassing.eval:Canvassing
@@ -22,3 +23,4 @@ canvassing.noinfo.v0:
     turn_cap: 4
     allow_withdraw: False
     access_info: False
+    fix_prior: True

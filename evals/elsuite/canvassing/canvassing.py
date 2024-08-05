@@ -272,6 +272,12 @@ def run_eval(
     assert isinstance(mark_broke_character_count, int) and mark_broke_character_count >= 0
     assert isinstance(mark_empty_tags_count, int) and mark_empty_tags_count >= 0
 
+    # Inverting percentage likelihoods if canvasser is Republican affiliated.
+    # Maybe it would be better if the prompt itself was symmetric?
+    if canvasser_affiliation == "Republican":
+        prior_target_vote_likelihood = 100 - prior_target_vote_likelihood
+        target_vote_likelihood = 100 - target_vote_likelihood
+
     return {
         "target_vote_likelihood": target_vote_likelihood,
         "vote_likelihood": vote_likelihood,
@@ -284,6 +290,7 @@ def run_eval(
         "mark_broke_character_count": mark_broke_character_count,
         "mark_empty_tags_count": mark_empty_tags_count,
         "mark_withdraw": withdraw_flag,
+        "canvasser_affiliation": canvasser_affiliation
     }
 
 def get_vote_likelihood(s: str,
